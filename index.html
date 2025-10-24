@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Moon, Sun, ChevronDown, Swords, BookOpen, Crown, Shield, Flame } from "lucide-react";
+import { Moon, Sun, ChevronDown, Swords, BookOpen, Crown, Shield } from "lucide-react";
 
 // ------------------ Fantasy Theming (fonts + vars) ------------------
 const FantasyStyles = () => (
@@ -183,60 +183,126 @@ const ScrollProgress = () => {
 
 type BodyKey = 'planet' | 'moon_alpha' | 'moon_beta' | 'moon_gamma' | 'moon_delta';
 
-const bodies: Record<BodyKey, { title: string; blurb: string }> = {
+// Ambient SFX URLs are placeholders — swap with your own hosted .mp3/.ogg files
+const AMBIENT = {
+  forest: '', // e.g., '/audio/forest-night.mp3'
+  desert: '', // e.g., '/audio/desert-wind.mp3'
+  mountain: '', // e.g., '/audio/mountain-gale.mp3'
+  secrets: '', // e.g., '/audio/whispers-low.mp3'
+  world: '', // e.g., '/audio/ancient-orrery.mp3'
+};
+
+const bodies: Record<BodyKey, { title: string; blurb: string; href: string; linkTitle: string; tone: { accent: string; vignette: string }; sfx?: string }> = {
   planet: {
     title: 'Trimoons — The World',
     blurb:
       'A temperate world forged by rival tides. Jungles stitch the equator, deserts crown the volcanic west, and iron mountains spear the north. Empires rise and fall beneath the pull of four moons.',
+    href: '#races',
+    linkTitle: 'Meet the Peoples',
+    tone: { accent: '#c8a24b', vignette: 'rgba(0,0,0,0.45)' },
+    sfx: AMBIENT.world,
   },
   moon_alpha: {
     title: 'First Moon — ALARA',
     blurb:
       'The shepherd of tides. Priests track its silver phases to bless voyages and bind vows. When ALARA swells full, jungle canopies hum with night-harvest rites.',
+    href: '#race-nosams',
+    linkTitle: 'Go to Nosams',
+    tone: { accent: '#2d6a4f', vignette: 'rgba(9, 30, 22, 0.55)' },
+    sfx: AMBIENT.forest,
   },
   moon_beta: {
     title: 'Second Moon — VARYN',
     blurb:
       'Copper-stained and ill-omened. Desert clans swear VARYN drags ash-winds across the volcanic lands; war drums often follow its zenith.',
+    href: '#race-normandas',
+    linkTitle: 'Go to Normandas',
+    tone: { accent: '#7a3e2e', vignette: 'rgba(58, 16, 6, 0.6)' },
+    sfx: AMBIENT.desert,
   },
   moon_gamma: {
     title: 'Third Moon — SERETH',
     blurb:
       'Pale and high, beloved by mountain sages. Pilgrims leave iron charms along ridge paths to catch SERETH’s cold blessings.',
+    href: '#race-normanis',
+    linkTitle: 'Go to Normanis',
+    tone: { accent: '#1f306e', vignette: 'rgba(4, 12, 35, 0.6)' },
+    sfx: AMBIENT.mountain,
   },
   moon_delta: {
     title: 'Fourth Moon — ITHA',
     blurb:
       'A faint wanderer that appears to shiver. Lovers and spies alike swear secrets travel easiest under ITHA’s shy arc.',
+    href: '#chapter-4',
+    linkTitle: 'Jump to Chapter Four',
+    tone: { accent: '#6b5ca5', vignette: 'rgba(20, 12, 45, 0.55)' },
+    sfx: AMBIENT.secrets,
   },
 };
 
 const RadialButtons: React.FC<{ onPick: (k: BodyKey) => void }> = ({ onPick }) => (
   <div className="pointer-events-none absolute inset-0">
-    {/* Up */}
     <button onClick={() => onPick('moon_alpha')} className="pointer-events-auto absolute left-1/2 top-[6%] -translate-x-1/2 rounded-full border border-[rgba(200,162,75,0.5)] bg-black/40 px-3 py-1 text-xs text-[var(--fantasy-gold)] backdrop-blur hover:bg-black/60">ALARA</button>
-    {/* Right */}
     <button onClick={() => onPick('moon_beta')} className="pointer-events-auto absolute right-[6%] top-1/2 -translate-y-1/2 rounded-full border border-[rgba(200,162,75,0.5)] bg-black/40 px-3 py-1 text-xs text-[var(--fantasy-gold)] backdrop-blur hover:bg-black/60">VARYN</button>
-    {/* Down */}
     <button onClick={() => onPick('moon_gamma')} className="pointer-events-auto absolute bottom-[6%] left-1/2 -translate-x-1/2 rounded-full border border-[rgba(200,162,75,0.5)] bg-black/40 px-3 py-1 text-xs text-[var(--fantasy-gold)] backdrop-blur hover:bg-black/60">SERETH</button>
-    {/* Left */}
     <button onClick={() => onPick('moon_delta')} className="pointer-events-auto absolute left-[6%] top-1/2 -translate-y-1/2 rounded-full border border-[rgba(200,162,75,0.5)] bg-black/40 px-3 py-1 text-xs text-[var(--fantasy-gold)] backdrop-blur hover:bg-black/60">ITHA</button>
-    {/* Center */}
     <button onClick={() => onPick('planet')} className="pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[rgba(200,162,75,0.5)] bg-black/40 px-3 py-1 text-xs text-[var(--fantasy-gold)] backdrop-blur hover:bg-black/60">Planet</button>
   </div>
 );
 
+// Ambient audio hook
+const useAmbient = (src: string | undefined, playing: boolean) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (!src) return; // no audio provided
+    if (!audioRef.current) {
+      const a = new Audio(src);
+      a.loop = true;
+      a.volume = 0.35;
+      audioRef.current = a;
+    }
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) a.play().catch(()=>{}); else a.pause();
+    return () => { a.pause(); };
+  }, [src, playing]);
+};
+
 const BodyModal: React.FC<{ open: boolean; onClose: () => void; body: BodyKey }> = ({ open, onClose, body }) => {
-  if (!open) return null;
+  const [ambience, setAmbience] = useState(false);
   const info = bodies[body];
+  useAmbient(info.sfx, ambience);
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    root.style.setProperty('--scene-accent', info.tone.accent);
+    root.style.setProperty('--scene-vignette', info.tone.vignette);
+    return () => {
+      root.style.removeProperty('--scene-accent');
+      root.style.removeProperty('--scene-vignette');
+    };
+  }, [open, info]);
+  if (!open) return null;
   return (
-    <motion.div className="fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <motion.div className="max-w-lg overflow-hidden rounded-2xl border border-[rgba(200,162,75,0.35)] bg-[rgba(255,247,231,0.95)] shadow-2xl" initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }}>
+    <motion.div className="fixed inset-0 z-[60] grid place-items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div className="absolute inset-0" style={{ background: `radial-gradient(90% 60% at 50% 10%, rgba(0,0,0,0), var(--scene-vignette, rgba(0,0,0,0.45)))` }} />
+      <motion.div className="relative z-10 max-w-lg overflow-hidden rounded-2xl border border-[rgba(200,162,75,0.35)] bg-[rgba(255,247,231,0.95)] shadow-2xl" initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }}>
         <div className="border-b border-[rgba(200,162,75,0.25)] p-4">
-          <h3 className="font-display text-xl text-[var(--fantasy-deep)]">{info.title}</h3>
+          <h3 className="font-display text-xl" style={{ color: 'var(--scene-accent, #2f7c64)' }}>{info.title}</h3>
         </div>
         <div className="p-4">
           <p className="font-body text-[15px] leading-relaxed text-zinc-900">{info.blurb}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <a href={info.href} className="rounded-md border border-[rgba(200,162,75,0.45)] px-3 py-1.5 font-display text-sm text-[var(--fantasy-deep)] hover:bg-amber-50">
+              {info.linkTitle}
+            </a>
+            <button onClick={() => setAmbience(a=>!a)} className="rounded-md border border-[rgba(200,162,75,0.45)] px-3 py-1.5 font-display text-sm text-[var(--fantasy-deep)] hover:bg-amber-50 disabled:opacity-50" disabled={!info.sfx}>
+              {ambience ? 'Pause ambience' : 'Play ambience'}
+            </button>
+            {!info.sfx && (
+              <span className="text-xs opacity-60">(add an audio URL in AMBIENT to enable)</span>
+            )}
+          </div>
         </div>
         <div className="flex justify-end gap-2 border-t border-[rgba(200,162,75,0.25)] p-3">
           <Button onClick={onClose} variant="outline" className="border-[rgba(200,162,75,0.45)]">Close</Button>
@@ -277,6 +343,12 @@ export default function AnimatedBookWorld(){
   const heroRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start end","end start"]});
   const parchmentDepth = useTransform(scrollYProgress, [0,1],[0.3,0.1]);
+
+  // Lightweight DOM sanity checks ("tests") in dev
+  useEffect(() => {
+    const chapters = document.querySelectorAll('section#chapters');
+    console.assert(chapters.length === 1, `Expected exactly one #chapters section, found ${chapters.length}`);
+  }, []);
 
   return (
     <div className="min-h-screen font-body text-slate-100" style={{ background: "radial-gradient(120% 120% at 50% -20%, #1a1f29, #0b0e15 60%, #06070a 100%)" }}>
@@ -346,28 +418,29 @@ export default function AnimatedBookWorld(){
         </div>
       </section>
 
-      {/* Races, Chapters, Summary (unchanged below) */
-      }
+      {/* Races */}
       <section id="races" className="relative mx-auto max-w-6xl px-4 py-14">
         <div className="orn-divider mb-6 text-center font-display text-2xl text-[var(--fantasy-gold)]">Peoples of the Realm</div>
         <div className="grid gap-5 sm:grid-cols-2">
-          <Crest kind="Nosams" trait="Blue-skinned • Jungle" description="Forest tacticians whose vows are carved in living wood." />
-          <Crest kind="Narminas" trait="Blue-skinned • Jungle" description="Disciplined allies whose banners ripple like water." />
-          <Crest kind="Normandas" trait="Desert • Volcano" description="Ash-born warriors guarding rivers of gold beneath stone." />
-          <Crest kind="Normanis" trait="Mountain Giants • Spiritual" description="High-peak sages who weigh honor like iron." />
+          <div id="race-nosams"><Crest kind="Nosams" trait="Blue-skinned • Jungle" description="Forest tacticians whose vows are carved in living wood." /></div>
+          <div id="race-narminas"><Crest kind="Narminas" trait="Blue-skinned • Jungle" description="Disciplined allies whose banners ripple like water." /></div>
+          <div id="race-normandas"><Crest kind="Normandas" trait="Desert • Volcano" description="Ash-born warriors guarding rivers of gold beneath stone." /></div>
+          <div id="race-normanis"><Crest kind="Normanis" trait="Mountain Giants • Spiritual" description="High-peak sages who weigh honor like iron." /></div>
         </div>
       </section>
 
+      {/* Chapters */}
       <section id="chapters" className="relative mx-auto max-w-3xl px-4 py-14">
         <div className="orn-divider mb-6 text-center font-display text-2xl text-[var(--fantasy-gold)]">Chapters</div>
         <div className="flex flex-col gap-4">
-          <Chapter title="Chapter One – The First Day of War" emoji="⚔️">The Nosam–Narmina alliance clashes with the Normandas for control of gold mines. Nine-year-old Prince Musa commands the left flank with courage. King Normosse holds the center; Prince Macki leads the right. Victory crowns the alliance—yet new promises sow tension.</Chapter>
-          <Chapter title="Chapter Two – Return to the Capital" emoji="🏰">King Normosse orders Musa back to the capital to stay with his mother. Loot and prisoners trail the convoy home, guarded by a loyal veteran who has watched over the prince for years. The taste of war fades as politics approaches.</Chapter>
-          <Chapter title="Chapter Three – Shadows of Doubt" emoji="⛺">On the march to another mine, the king’s tent—borne by Normandan slaves—rests for the night. A trusted advisor warns that Musa’s rising fame could one day turn. The king rebukes him, but a darker thought has already taken root.</Chapter>
-          <Chapter title="Chapter Four – The Secret Letter" emoji="🕯️">In the hush of night, the advisor dictates a secret letter to the king’s second wife: the prince grows too beloved. It ends with a code—“Make sure the breads are ready for a feast.” A signal that a hidden plot has begun.</Chapter>
+          <div id="chapter-1"><Chapter title="Chapter One – The First Day of War" emoji="⚔️">The Nosam–Narmina alliance clashes with the Normandas for control of gold mines. Nine-year-old Prince Musa commands the left flank with courage. King Normosse holds the center; Prince Macki leads the right. Victory crowns the alliance—yet new promises sow tension.</Chapter></div>
+          <div id="chapter-2"><Chapter title="Chapter Two – Return to the Capital" emoji="🏰">King Normosse orders Musa back to the capital to stay with his mother. Loot and prisoners trail the convoy home, guarded by a loyal veteran who has watched over the prince for years. The taste of war fades as politics approaches.</Chapter></div>
+          <div id="chapter-3"><Chapter title="Chapter Three – Shadows of Doubt" emoji="⛺">On the march to another mine, the king’s tent—borne by Normandan slaves—rests for the night. A trusted advisor warns that Musa’s rising fame could one day turn. The king rebukes him, but a darker thought has already taken root.</Chapter></div>
+          <div id="chapter-4"><Chapter title="Chapter Four – The Secret Letter" emoji="🕯️">In the hush of night, the advisor dictates a secret letter to the king’s second wife: the prince grows too beloved. It ends with a code—“Make sure the breads are ready for a feast.” A signal that a hidden plot has begun.</Chapter></div>
         </div>
       </section>
 
+      {/* Summary */}
       <section id="summary" className="relative mx-auto max-w-4xl px-4 pb-24 pt-10">
         <div className="orn-divider mb-6 text-center font-display text-2xl text-[var(--fantasy-gold)]">Story So Far</div>
         <div className="grid gap-4 sm:grid-cols-2">
