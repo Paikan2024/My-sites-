@@ -1,0 +1,472 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Moon, Sun, ChevronDown, Swords, BookOpen, Crown, Shield } from "lucide-react";
+
+// ------------------ Fantasy Theming (fonts + vars) ------------------
+const FantasyStyles = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Crimson+Text:wght@400;600;700&display=swap');
+    :root{
+      --fantasy-gold: #c8a24b;
+      --fantasy-deep: #0b0e15;
+      --fantasy-burgundy: #3a0d13;
+      --fantasy-emerald: #2f7c64;
+    }
+    .font-display{ font-family: 'Cinzel Decorative', ui-serif, Georgia, serif; letter-spacing: 0.5px; }
+    .font-body{ font-family: 'Crimson Text', ui-serif, Georgia, serif; }
+    .paper{
+      background: radial-gradient(120% 120% at 50% 0%, rgba(255,247,231,0.8), rgba(237,224,200,0.85) 40%, rgba(210,192,153,0.9) 65%, rgba(150,126,88,0.9) 95%);
+      box-shadow: inset 0 2px 40px rgba(0,0,0,0.2), 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .ink{ color: #1c1408; }
+    .orn-divider{ position: relative; }
+    .orn-divider:before, .orn-divider:after{ content:''; position:absolute; top:50%; width:40%; height:1px; background:linear-gradient(to var(--dir, left), transparent, rgba(200,162,75,0.8)); }
+    .orn-divider:before{ left:0; --dir:right; }
+    .orn-divider:after{ right:0; --dir:left; }
+    .torch-vignette{ pointer-events:none; position:fixed; inset:0; background: radial-gradient(90% 60% at 50% 10%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.15) 60%, rgba(0,0,0,0.45) 100%); mix-blend-mode:multiply; }
+  `}</style>
+);
+
+// ------------------ Ember Motes (replace starfield) ------------------
+const EmberMotes: React.FC<{ count?: number }> = ({ count = 120 }) => {
+  const motes = useMemo(() => Array.from({ length: count }, (_, i) => ({ id: i, x: Math.random()*100, y: Math.random()*100, s: Math.random()*2+0.5, d: 6+Math.random()*6 })), [count]);
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      {motes.map(m => (
+        <motion.div key={m.id} className="absolute rounded-full" style={{ left: `${m.x}%`, top: `${m.y}%`, width: m.s, height: m.s, background: 'rgba(255,210,154,0.8)', boxShadow: '0 0 6px rgba(255,210,154,0.8)'}} animate={{ y: [0, -10, 0], opacity: [0.2, 0.9, 0.2] }} transition={{ duration: m.d, repeat: Infinity, delay: Math.random()*4 }} />
+      ))}
+      {/* Flicker sweep */}
+      <motion.div className="absolute inset-0" style={{ background: "linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.05) 50%, transparent 60%)" }} animate={{ backgroundPosition: ["0% 0%", "120% 0%", "0% 0%"] }} transition={{ duration: 14, repeat: Infinity }} />
+    </div>
+  );
+};
+
+// ------------------ ORRERY: Brass world with FOUR moons ------------------
+const OrreryScene: React.FC = () => (
+  <div className="relative mx-auto mt-8 h-[26rem] w-[26rem] sm:h-[30rem] sm:w-[30rem]">
+    {/* Brass astrolabe rings */}
+    {[1, 0.82, 0.64].map((scale, i) => (
+      <motion.svg key={i} viewBox="-50 -50 100 100" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: `${100*scale}%`, height: `${100*scale}%` }} animate={{ rotate: i % 2 ? -360 : 360 }} transition={{ duration: 80 - i*10, repeat: Infinity, ease: "linear" }}>
+        <circle r="45" fill="none" stroke="rgba(200,162,75,0.6)" strokeWidth={i===0?2:1} />
+        <path d="M-45 0 H45" stroke="rgba(200,162,75,0.35)" />
+        <path d="M0 -45 V45" stroke="rgba(200,162,75,0.35)" />
+      </motion.svg>
+    ))}
+
+    {/* Globe */}
+    <motion.div className="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #3b5d7a, #1d2b3a 50%, #0a0f16 70%)", boxShadow: "inset 0 0 22px rgba(0,0,0,0.7), 0 0 40px rgba(200,162,75,0.15)" }} animate={{ y: [0, -3, 0] }} transition={{ duration: 7, repeat: Infinity }} />
+
+    {/* Compass rose */}
+    <motion.svg viewBox="0 0 100 100" className="absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2" animate={{ rotate: -360 }} transition={{ duration: 120, repeat: Infinity, ease: "linear" }}>
+      <g fill="rgba(200,162,75,0.25)">
+        <polygon points="50,5 54,46 50,54 46,46" />
+        <polygon points="95,50 54,46 46,46 54,54" />
+        <polygon points="50,95 46,54 50,46 54,54" />
+        <polygon points="5,50 46,54 54,54 46,46" />
+      </g>
+    </motion.svg>
+
+    {/* FOUR moons on brass arms */}
+    <ArmMoon radius={120} size={12} duration={26} delay={0} />
+    <ArmMoon radius={148} size={10} duration={34} delay={2} />
+    <ArmMoon radius={176} size={14} duration={40} delay={4} />
+    <ArmMoon radius={204} size={9} duration={48} delay={6} />
+  </div>
+);
+
+const ArmMoon: React.FC<{ radius: number; size: number; duration: number; delay?: number }> = ({ radius, size, duration, delay = 0 }) => (
+  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+    <div className="relative" style={{ width: radius*2, height: radius*2 }}>
+      {/* arm */}
+      <motion.div className="absolute left-1/2 top-1/2 h-px w-1/2 origin-left" style={{ background: "linear-gradient(to right, rgba(200,162,75,0.1), rgba(200,162,75,0.8))" }} animate={{ rotate: 360 }} transition={{ duration, repeat: Infinity, ease: "linear", delay }} />
+      {/* moon */}
+      <motion.div className="absolute left-full top-1/2 -translate-y-1/2 rounded-full" style={{ width: size, height: size, background: "radial-gradient(circle at 30% 30%, #ececec, #adadad)", boxShadow: "0 0 8px rgba(255,255,255,0.4)" }} animate={{ rotate: 360 }} transition={{ duration, repeat: Infinity, ease: "linear", delay }} />
+    </div>
+  </div>
+);
+
+// ------------------ Race Crests (no images) ------------------
+
+type RaceKind = "Nosams" | "Narminas" | "Normandas" | "Normanis";
+
+const Crest: React.FC<{ kind: RaceKind; trait: string; description: string }> = ({ kind, trait, description }) => {
+  const colors: Record<RaceKind, {base:string, glow:string}> = {
+    Nosams: { base: "#2d6a4f", glow: "#8ff0c1" },
+    Narminas: { base: "#22577a", glow: "#7ad7f0" },
+    Normandas:{ base: "#7a3e2e", glow: "#f4b693" },
+    Normanis: { base: "#1f306e", glow: "#c6d7ff" },
+  };
+  const { base, glow } = colors[kind];
+
+  return (
+    <Card className="group paper ink">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between font-display text-xl text-[var(--fantasy-deep)]">
+          <span>{kind}</span>
+          <span className="text-xs font-normal opacity-70">{trait}</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-4">
+          <motion.svg viewBox="0 0 120 140" className="h-28 w-24" initial={{ scale: 0.98 }} whileHover={{ scale: 1.02 }}>
+            {/* Shield */}
+            <defs>
+              <linearGradient id={`${kind}-metal`} x1="0" x2="1">
+                <stop offset="0%" stopColor="#c5a66a"/>
+                <stop offset="50%" stopColor="#e3c88a"/>
+                <stop offset="100%" stopColor="#9a7b45"/>
+              </linearGradient>
+            </defs>
+            <motion.path d="M60 10 L100 30 V70 C100 100 80 118 60 130 C40 118 20 100 20 70 V30 Z" fill={`url(#${kind}-metal)`} stroke="#5b4724" strokeWidth="2" animate={{ filter: ["drop-shadow(0 0 0 rgba(0,0,0,0))","drop-shadow(0 0 6px rgba(200,162,75,0.5))","drop-shadow(0 0 0 rgba(0,0,0,0))"] }} transition={{ duration: 4, repeat: Infinity }} />
+            {/* Sigils per race */}
+            {kind === 'Nosams' && (
+              <g>
+                <motion.path d="M60 36 q18 8 0 24 q-18 -16 0 -24" fill={base} opacity="0.9" animate={{ y:[0,-1,0] }} transition={{ duration:3, repeat:Infinity }} />
+                <motion.circle cx="60" cy="48" r="20" fill="transparent" stroke={glow} strokeOpacity="0.7" strokeDasharray="3 6" animate={{ strokeDashoffset:[0,8,0] }} transition={{ duration:4, repeat:Infinity }} />
+              </g>
+            )}
+            {kind === 'Narminas' && (
+              <g>
+                <motion.path d="M40 80 L80 80 L60 40 Z" fill={base} animate={{ scale:[1,1.05,1] }} transition={{ duration:4, repeat:Infinity }} />
+                <motion.circle cx="60" cy="68" r="6" fill={glow} animate={{ opacity:[0.4,1,0.4] }} transition={{ duration:2.5, repeat:Infinity }} />
+              </g>
+            )}
+            {kind === 'Normandas' && (
+              <g>
+                <motion.rect x="44" y="46" width="32" height="22" rx="3" fill={base} animate={{ rotate:[0,1,-1,0] }} transition={{ duration:5, repeat:Infinity }} />
+                {[...Array(6)].map((_,i)=>(<motion.circle key={i} cx={40+Math.random()*40} cy={90+Math.random()*10} r="1" fill="#ffd29a" initial={{opacity:0}} animate={{opacity:[0,1,0], y:[0,-6,-10]}} transition={{duration:3+Math.random()*2, repeat:Infinity, delay:i*0.3}}/>))}
+              </g>
+            )}
+            {kind === 'Normanis' && (
+              <g>
+                <motion.path d="M60 38 L72 56 L60 74 L48 56 Z" fill={base} animate={{ y:[0, -1, 0] }} transition={{ duration:3.5, repeat:Infinity }} />
+                <motion.circle cx="60" cy="56" r="18" fill="transparent" stroke={glow} strokeWidth="1.5" animate={{ r:[16,19,16], opacity:[0.6,0.2,0.6] }} transition={{ duration:5, repeat:Infinity }} />
+              </g>
+            )}
+          </motion.svg>
+          <p className="font-body text-[15px] leading-relaxed text-zinc-800/90 dark:text-zinc-100/90">{description}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// ------------------ Chapter Accordion ------------------
+const Chapter: React.FC<{ title: string; emoji: string; children: React.ReactNode }> = ({ title, emoji, children }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[rgba(200,162,75,0.35)] bg-[rgba(255,247,231,0.4)]">
+      <button className="flex w-full items-center justify-between px-4 py-3 text-left font-display" onClick={() => setOpen((o)=>!o)}>
+        <div className="flex items-center gap-2 text-lg">
+          <span className="opacity-90">{emoji}</span>
+          <span className="text-[var(--fantasy-deep)]">{title}</span>
+        </div>
+        <ChevronDown className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <motion.div initial={false} animate={{ height: open ? 'auto' : 0, opacity: open ? 1 : 0 }} className="px-4">
+        <div className="pb-4 pt-1 font-body text-[15px] leading-relaxed text-zinc-800/90 dark:text-zinc-100/90">{children}</div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ------------------ Scroll Progress ------------------
+const ScrollProgress = () => {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useTransform(scrollYProgress, [0,1],[0,1]);
+  return <motion.div style={{ scaleX }} className="fixed left-0 top-0 z-50 h-1 w-full origin-left" initial={{ background: 'linear-gradient(90deg, #c8a24b, #b68a3d)' }} />
+}
+
+// ------------------ World Explorer (interactive) ------------------
+
+type BodyKey = 'planet' | 'moon_alpha' | 'moon_beta' | 'moon_gamma' | 'moon_delta';
+
+// Ambient SFX URLs are placeholders — swap with your own hosted .mp3/.ogg files
+const AMBIENT = {
+  forest: '', // e.g., '/audio/forest-night.mp3'
+  desert: '', // e.g., '/audio/desert-wind.mp3'
+  mountain: '', // e.g., '/audio/mountain-gale.mp3'
+  secrets: '', // e.g., '/audio/whispers-low.mp3'
+  world: '', // e.g., '/audio/ancient-orrery.mp3'
+};
+
+const bodies: Record<BodyKey, { title: string; blurb: string; href: string; linkTitle: string; tone: { accent: string; vignette: string }; sfx?: string }> = {
+  planet: {
+    title: 'Trimoons — The World',
+    blurb:
+      'A temperate world forged by rival tides. Jungles stitch the equator, deserts crown the volcanic west, and iron mountains spear the north. Empires rise and fall beneath the pull of four moons.',
+    href: '#races',
+    linkTitle: 'Meet the Peoples',
+    tone: { accent: '#c8a24b', vignette: 'rgba(0,0,0,0.45)' },
+    sfx: AMBIENT.world,
+  },
+  moon_alpha: {
+    title: 'First Moon — ALARA',
+    blurb:
+      'The shepherd of tides. Priests track its silver phases to bless voyages and bind vows. When ALARA swells full, jungle canopies hum with night-harvest rites.',
+    href: '#race-nosams',
+    linkTitle: 'Go to Nosams',
+    tone: { accent: '#2d6a4f', vignette: 'rgba(9, 30, 22, 0.55)' },
+    sfx: AMBIENT.forest,
+  },
+  moon_beta: {
+    title: 'Second Moon — VARYN',
+    blurb:
+      'Copper-stained and ill-omened. Desert clans swear VARYN drags ash-winds across the volcanic lands; war drums often follow its zenith.',
+    href: '#race-normandas',
+    linkTitle: 'Go to Normandas',
+    tone: { accent: '#7a3e2e', vignette: 'rgba(58, 16, 6, 0.6)' },
+    sfx: AMBIENT.desert,
+  },
+  moon_gamma: {
+    title: 'Third Moon — SERETH',
+    blurb:
+      'Pale and high, beloved by mountain sages. Pilgrims leave iron charms along ridge paths to catch SERETH’s cold blessings.',
+    href: '#race-normanis',
+    linkTitle: 'Go to Normanis',
+    tone: { accent: '#1f306e', vignette: 'rgba(4, 12, 35, 0.6)' },
+    sfx: AMBIENT.mountain,
+  },
+  moon_delta: {
+    title: 'Fourth Moon — ITHA',
+    blurb:
+      'A faint wanderer that appears to shiver. Lovers and spies alike swear secrets travel easiest under ITHA’s shy arc.',
+    href: '#chapter-4',
+    linkTitle: 'Jump to Chapter Four',
+    tone: { accent: '#6b5ca5', vignette: 'rgba(20, 12, 45, 0.55)' },
+    sfx: AMBIENT.secrets,
+  },
+};
+
+const RadialButtons: React.FC<{ onPick: (k: BodyKey) => void }> = ({ onPick }) => (
+  <div className="pointer-events-none absolute inset-0">
+    <button onClick={() => onPick('moon_alpha')} className="pointer-events-auto absolute left-1/2 top-[6%] -translate-x-1/2 rounded-full border border-[rgba(200,162,75,0.5)] bg-black/40 px-3 py-1 text-xs text-[var(--fantasy-gold)] backdrop-blur hover:bg-black/60">ALARA</button>
+    <button onClick={() => onPick('moon_beta')} className="pointer-events-auto absolute right-[6%] top-1/2 -translate-y-1/2 rounded-full border border-[rgba(200,162,75,0.5)] bg-black/40 px-3 py-1 text-xs text-[var(--fantasy-gold)] backdrop-blur hover:bg-black/60">VARYN</button>
+    <button onClick={() => onPick('moon_gamma')} className="pointer-events-auto absolute bottom-[6%] left-1/2 -translate-x-1/2 rounded-full border border-[rgba(200,162,75,0.5)] bg-black/40 px-3 py-1 text-xs text-[var(--fantasy-gold)] backdrop-blur hover:bg-black/60">SERETH</button>
+    <button onClick={() => onPick('moon_delta')} className="pointer-events-auto absolute left-[6%] top-1/2 -translate-y-1/2 rounded-full border border-[rgba(200,162,75,0.5)] bg-black/40 px-3 py-1 text-xs text-[var(--fantasy-gold)] backdrop-blur hover:bg-black/60">ITHA</button>
+    <button onClick={() => onPick('planet')} className="pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[rgba(200,162,75,0.5)] bg-black/40 px-3 py-1 text-xs text-[var(--fantasy-gold)] backdrop-blur hover:bg-black/60">Planet</button>
+  </div>
+);
+
+// Ambient audio hook
+const useAmbient = (src: string | undefined, playing: boolean) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (!src) return; // no audio provided
+    if (!audioRef.current) {
+      const a = new Audio(src);
+      a.loop = true;
+      a.volume = 0.35;
+      audioRef.current = a;
+    }
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) a.play().catch(()=>{}); else a.pause();
+    return () => { a.pause(); };
+  }, [src, playing]);
+};
+
+const BodyModal: React.FC<{ open: boolean; onClose: () => void; body: BodyKey }> = ({ open, onClose, body }) => {
+  const [ambience, setAmbience] = useState(false);
+  const info = bodies[body];
+  useAmbient(info.sfx, ambience);
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    root.style.setProperty('--scene-accent', info.tone.accent);
+    root.style.setProperty('--scene-vignette', info.tone.vignette);
+    return () => {
+      root.style.removeProperty('--scene-accent');
+      root.style.removeProperty('--scene-vignette');
+    };
+  }, [open, info]);
+  if (!open) return null;
+  return (
+    <motion.div className="fixed inset-0 z-[60] grid place-items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div className="absolute inset-0" style={{ background: `radial-gradient(90% 60% at 50% 10%, rgba(0,0,0,0), var(--scene-vignette, rgba(0,0,0,0.45)))` }} />
+      <motion.div className="relative z-10 max-w-lg overflow-hidden rounded-2xl border border-[rgba(200,162,75,0.35)] bg-[rgba(255,247,231,0.95)] shadow-2xl" initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }}>
+        <div className="border-b border-[rgba(200,162,75,0.25)] p-4">
+          <h3 className="font-display text-xl" style={{ color: 'var(--scene-accent, #2f7c64)' }}>{info.title}</h3>
+        </div>
+        <div className="p-4">
+          <p className="font-body text-[15px] leading-relaxed text-zinc-900">{info.blurb}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <a href={info.href} className="rounded-md border border-[rgba(200,162,75,0.45)] px-3 py-1.5 font-display text-sm text-[var(--fantasy-deep)] hover:bg-amber-50">
+              {info.linkTitle}
+            </a>
+            <button onClick={() => setAmbience(a=>!a)} className="rounded-md border border-[rgba(200,162,75,0.45)] px-3 py-1.5 font-display text-sm text-[var(--fantasy-deep)] hover:bg-amber-50 disabled:opacity-50" disabled={!info.sfx}>
+              {ambience ? 'Pause ambience' : 'Play ambience'}
+            </button>
+            {!info.sfx && (
+              <span className="text-xs opacity-60">(add an audio URL in AMBIENT to enable)</span>
+            )}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-[rgba(200,162,75,0.25)] p-3">
+          <Button onClick={onClose} variant="outline" className="border-[rgba(200,162,75,0.45)]">Close</Button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+const WorldExplorer: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<BodyKey>('planet');
+  const onPick = (k: BodyKey) => { setPicked(k); setOpen(true); };
+  return (
+    <div className="relative">
+      <div className="relative" onClick={() => setOpen(true)}>
+        <OrreryScene />
+        <RadialButtons onPick={onPick} />
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {(['planet','moon_alpha','moon_beta','moon_gamma','moon_delta'] as BodyKey[]).map(k => (
+          <button key={k} onClick={() => onPick(k)} className="rounded-lg border border-[rgba(200,162,75,0.35)] bg-black/30 px-3 py-2 text-left font-display text-sm text-[var(--fantasy-gold)] hover:bg-black/50">
+            {bodies[k].title}
+          </button>
+        ))}
+      </div>
+      <BodyModal open={open} onClose={() => setOpen(false)} body={picked} />
+    </div>
+  );
+};
+
+// ------------------ Main App ------------------
+export default function AnimatedBookWorld(){
+  const [dark, setDark] = useState(true);
+  useEffect(()=>{ document.documentElement.classList.toggle('dark', dark); },[dark]);
+  const toggle = ()=> setDark(d=>!d);
+
+  const heroRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start end","end start"]});
+  const parchmentDepth = useTransform(scrollYProgress, [0,1],[0.3,0.1]);
+
+  // Lightweight DOM sanity checks ("tests") in dev
+  useEffect(() => {
+    const chapters = document.querySelectorAll('section#chapters');
+    console.assert(chapters.length === 1, `Expected exactly one #chapters section, found ${chapters.length}`);
+  }, []);
+
+  return (
+    <div className="min-h-screen font-body text-slate-100" style={{ background: "radial-gradient(120% 120% at 50% -20%, #1a1f29, #0b0e15 60%, #06070a 100%)" }}>
+      <FantasyStyles />
+      <ScrollProgress />
+      <div className="torch-vignette" />
+      <EmberMotes />
+
+      {/* Nav */}
+      <header className="sticky top-0 z-40 border-b border-[rgba(200,162,75,0.2)] bg-black/30 backdrop-blur supports-[backdrop-filter]:bg-black/30">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2 font-display text-lg text-[var(--fantasy-gold)]">
+            <Crown className="h-5 w-5" />
+            <span>Chronicles of Trimoons</span>
+          </div>
+          <nav className="hidden gap-6 sm:flex font-display text-[15px] text-[var(--fantasy-gold)]/90">
+            <a href="#home" className="hover:opacity-100 opacity-80">Home</a>
+            <a href="#world" className="hover:opacity-100 opacity-80">World</a>
+            <a href="#races" className="hover:opacity-100 opacity-80">Races</a>
+            <a href="#chapters" className="hover:opacity-100 opacity-80">Chapters</a>
+            <a href="#summary" className="hover:opacity-100 opacity-80">Summary</a>
+          </nav>
+          <Button onClick={toggle} variant="outline" size="sm" className="gap-2 border-[rgba(200,162,75,0.45)] text-[var(--fantasy-gold)]">
+            {dark ? <Sun className="h-4 w-4"/> : <Moon className="h-4 w-4"/>}
+            Theme
+          </Button>
+        </div>
+      </header>
+
+      {/* HOME */}
+      <section id="home" className="relative mx-auto max-w-6xl px-4 pb-16 pt-12 sm:pt-16">
+        <div className="grid items-center gap-10 sm:grid-cols-2">
+          <div>
+            <motion.h1 className="mb-3 font-display text-4xl leading-tight sm:text-6xl text-[var(--fantasy-gold)]" initial={{ opacity:0, y:20 }} whileInView={{ opacity:1, y:0 }} viewport={{ once:true }}>
+              An Epic of War, Oaths, and Gold
+            </motion.h1>
+            <motion.p className="max-w-prose text-zinc-200/90" initial={{ opacity:0, y:10 }} whileInView={{ opacity:1, y:0 }} viewport={{ once:true }}>
+              In a far arm of the Milky Way, four peoples contest a world steered by four moons. From jungle alliances to volcanic wars and mountain vows—this saga follows Prince Musa from first battle to shadowed intrigue.
+            </motion.p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a href="#chapters"><Button className="gap-2 bg-[var(--fantasy-gold)] text-black hover:opacity-90"><Swords className="h-4 w-4"/> Start Reading</Button></a>
+              <a href="#world"><Button variant="outline" className="gap-2 border-[rgba(200,162,75,0.45)] text-[var(--fantasy-gold)]"><Shield className="h-4 w-4"/> Explore the World</Button></a>
+            </div>
+          </div>
+          <div className="relative">
+            <WorldExplorer />
+            <motion.div style={{ opacity: parchmentDepth }} className="pointer-events-none absolute -inset-10 rounded-full" />
+          </div>
+        </div>
+      </section>
+
+      {/* WORLD (standalone section for deep dive) */}
+      <section id="world" className="relative mx-auto max-w-6xl px-4 pb-20 pt-10">
+        <div className="orn-divider mb-6 text-center font-display text-2xl text-[var(--fantasy-gold)]">The World & Moons</div>
+        <div className="grid gap-10 sm:grid-cols-2">
+          <div className="order-2 sm:order-1">
+            <div className="paper ink rounded-2xl p-5">
+              <h3 className="font-display text-xl text-[var(--fantasy-deep)]">How the Moons Shape History</h3>
+              <p className="mt-2 font-body text-[15px] leading-relaxed text-zinc-900">
+                Tides, migrations, and harvests bend to the sky. The Nosams track river swells by ALARA; the Normandas march beneath VARYN’s ash; Normanis seers name SERETH in their iron prayers; and lovers whisper oaths under ITHA. Every pact keeps one eye on the heavens.
+              </p>
+            </div>
+          </div>
+          <div className="order-1 sm:order-2">
+            <WorldExplorer />
+          </div>
+        </div>
+      </section>
+
+      {/* Races */}
+      <section id="races" className="relative mx-auto max-w-6xl px-4 py-14">
+        <div className="orn-divider mb-6 text-center font-display text-2xl text-[var(--fantasy-gold)]">Peoples of the Realm</div>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div id="race-nosams"><Crest kind="Nosams" trait="Blue-skinned • Jungle" description="Forest tacticians whose vows are carved in living wood." /></div>
+          <div id="race-narminas"><Crest kind="Narminas" trait="Blue-skinned • Jungle" description="Disciplined allies whose banners ripple like water." /></div>
+          <div id="race-normandas"><Crest kind="Normandas" trait="Desert • Volcano" description="Ash-born warriors guarding rivers of gold beneath stone." /></div>
+          <div id="race-normanis"><Crest kind="Normanis" trait="Mountain Giants • Spiritual" description="High-peak sages who weigh honor like iron." /></div>
+        </div>
+      </section>
+
+      {/* Chapters */}
+      <section id="chapters" className="relative mx-auto max-w-3xl px-4 py-14">
+        <div className="orn-divider mb-6 text-center font-display text-2xl text-[var(--fantasy-gold)]">Chapters</div>
+        <div className="flex flex-col gap-4">
+          <div id="chapter-1"><Chapter title="Chapter One – The First Day of War" emoji="⚔️">The Nosam–Narmina alliance clashes with the Normandas for control of gold mines. Nine-year-old Prince Musa commands the left flank with courage. King Normosse holds the center; Prince Macki leads the right. Victory crowns the alliance—yet new promises sow tension.</Chapter></div>
+          <div id="chapter-2"><Chapter title="Chapter Two – Return to the Capital" emoji="🏰">King Normosse orders Musa back to the capital to stay with his mother. Loot and prisoners trail the convoy home, guarded by a loyal veteran who has watched over the prince for years. The taste of war fades as politics approaches.</Chapter></div>
+          <div id="chapter-3"><Chapter title="Chapter Three – Shadows of Doubt" emoji="⛺">On the march to another mine, the king’s tent—borne by Normandan slaves—rests for the night. A trusted advisor warns that Musa’s rising fame could one day turn. The king rebukes him, but a darker thought has already taken root.</Chapter></div>
+          <div id="chapter-4"><Chapter title="Chapter Four – The Secret Letter" emoji="🕯️">In the hush of night, the advisor dictates a secret letter to the king’s second wife: the prince grows too beloved. It ends with a code—“Make sure the breads are ready for a feast.” A signal that a hidden plot has begun.</Chapter></div>
+        </div>
+      </section>
+
+      {/* Summary */}
+      <section id="summary" className="relative mx-auto max-w-4xl px-4 pb-24 pt-10">
+        <div className="orn-divider mb-6 text-center font-display text-2xl text-[var(--fantasy-gold)]">Story So Far</div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card className="paper">
+            <CardHeader className="pb-2"><CardTitle className="font-display text-[var(--fantasy-deep)]">War & Victory</CardTitle></CardHeader>
+            <CardContent className="font-body text-[15px] text-zinc-900/90">Musa proves his courage in battle; alliances hold—barely.</CardContent>
+          </Card>
+          <Card className="paper">
+            <CardHeader className="pb-2"><CardTitle className="font-display text-[var(--fantasy-deep)]">Royal Decisions</CardTitle></CardHeader>
+            <CardContent className="font-body text-[15px] text-zinc-900/90">The king sends Musa home—war gives way to palace intrigue.</CardContent>
+          </Card>
+          <Card className="paper">
+            <CardHeader className="pb-2"><CardTitle className="font-display text-[var(--fantasy-deep)]">Seeds of Distrust</CardTitle></CardHeader>
+            <CardContent className="font-body text-[15px] text-zinc-900/90">An advisor questions loyalty, echoing old betrayals.</CardContent>
+          </Card>
+          <Card className="paper">
+            <CardHeader className="pb-2"><CardTitle className="font-display text-[var(--fantasy-deep)]">Hidden Plot</CardTitle></CardHeader>
+            <CardContent className="font-body text-[15px] text-zinc-900/90">A coded letter signals conspiracy within the royal household.</CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-[rgba(200,162,75,0.25)] px-4 py-8 text-center text-xs text-[var(--fantasy-gold)]/80">
+        © {new Date().getFullYear()} Chronicles of Trimoons — Fantasy site built with React, Tailwind, and Framer Motion. No images used.
+      </footer>
+    </div>
+  );
+}
